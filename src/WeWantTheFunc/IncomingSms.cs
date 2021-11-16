@@ -11,6 +11,7 @@ using Azure.AI.TextAnalytics;
 using Azure;
 using System.Linq;
 using Twilio.TwiML;
+using Azure.Messaging.EventGrid;
 
 namespace WeWantTheFunc
 {
@@ -35,6 +36,8 @@ namespace WeWantTheFunc
             Console.WriteLine($"Document sentiment: {documentSentiment.Sentiment}\n");
 
             var reply = string.Empty;
+            Feedback f = new Feedback();
+
             foreach (var sentence in documentSentiment.Sentences)
             {
                 log.LogInformation($"\tText: \"{sentence.Text}\"");
@@ -44,11 +47,19 @@ namespace WeWantTheFunc
                 log.LogInformation($"\tNeutral score: {sentence.ConfidenceScores.Neutral:0.00}\n");
 
                 reply = $"Sentiment: {sentence.Sentiment}, Score: {sentence.ConfidenceScores.Positive:0.00}";
+                
+                f.Id = new Guid();
+                f.Sentiment = sentence.Sentiment.ToString();
+                f.Message = sentence.Text;
+                f.Score = (int)(sentence.ConfidenceScores.Positive * 100);
+
                 break;
             }
 
             if (string.IsNullOrEmpty(reply))
                 reply = "Text analysis unavailable";
+
+            await SendFeedback(f);
 
             return new OkObjectResult(reply);
         }
@@ -82,6 +93,24 @@ namespace WeWantTheFunc
                 credentials);
 
             return client;
+        }
+
+        private static async Task SendFeedback(Feedback feedback)
+        {
+            var topicEndpoint = new Uri(Environment.GetEnvironmentVariable("TopicEndpoint"));
+            var credentials = new AzureKeyCredential(Environment.GetEnvironmentVariable("TopicApiKey"));
+
+            EventGridPublisherClient client = new EventGridPublisherClient(
+                topicEndpoint,
+                credentials);
+
+            var eventType = feedback.Score > 60 ? "Positive" : "Negative";
+            EventGridEvent e = new EventGridEvent("Feedback", 
+                eventType, 
+                "1.0", 
+                feedback); 
+
+            await client.SendEventAsync(e);
         }
     }
 }
