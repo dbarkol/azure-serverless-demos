@@ -47,8 +47,8 @@ namespace WeWantTheFunc
                 log.LogInformation($"\tNeutral score: {sentence.ConfidenceScores.Neutral:0.00}\n");
 
                 reply = $"Sentiment: {sentence.Sentiment}, Score: {sentence.ConfidenceScores.Positive:0.00}";
-                
-                f.Id = new Guid();
+
+                f.Id = Guid.NewGuid();
                 f.Sentiment = sentence.Sentiment.ToString();
                 f.Message = sentence.Text;
                 f.Score = (int)(sentence.ConfidenceScores.Positive * 100);
